@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import create_autospec
+from unittest.mock import create_autospec, call
 from todoist_api_python.api import TodoistAPI
 from todoist_api_python.models import Task as TodoistTask, Due as TodoistDue
 
@@ -49,25 +49,22 @@ def test_update_task_should_succeed_when_all_fields_provided(repository, mock_ap
         due_string="2024-01-20"
     )
 
-def test_update_task_should_fail_when_api_raises_exception(repository, mock_api):
-    """
-    Test that API exceptions are properly handled and returned as errors
-    """
-    # Arrange
-    task_id = "123"
-    update = TaskUpdate(content="Updated content")
+def test_update_task_api_error(repository, mock_api):
+    # Setup
     mock_api.update_task.side_effect = Exception("API Error")
+    update = TaskUpdate(content="Updated content")
     
-    # Act
-    result = repository.update_task(task_id, update)
+    # Execute
+    result = repository.update_task("123", update)
     
-    # Assert
+    # Verify
     assert not result.success
     assert "Failed to update task" in result.error
-    mock_api.update_task.assert_called_once_with(
-        task_id=task_id,
-        content="Updated content"
-    )
+    # Verify that the update was attempted max_retries times
+    expected_calls = [
+        call(task_id="123", content="Updated content")
+    ] * repository.config.max_retries
+    mock_api.update_task.assert_has_calls(expected_calls)
 
 def test_update_task_should_succeed_without_api_call_when_no_changes(repository, mock_api):
     """
