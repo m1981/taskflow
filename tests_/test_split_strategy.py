@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 import pytest
-from src.domain.splitting import SplitStrategy, SplitMetrics, ChunkPlacement
-from src.domain.task import Task, TaskConstraints, ZoneType, EnergyLevel
-from src.domain.timeblock import TimeBlockZone, Event, TimeBlockType
+from src_.domain.splitting import SplitStrategy, SplitMetrics, ChunkPlacement
+from src_.domain.task import Task, TaskConstraints, ZoneType, EnergyLevel
+from src_.domain.timeblock import TimeBlockZone, Event, TimeBlockType
 
 @pytest.fixture
 def strategy():

@@ -2,12 +2,12 @@ import dataclasses
 import pytest
 from datetime import datetime, timedelta
 from typing import List
-from src.domain.scheduling.strategies import SequenceBasedStrategy
-from src.domain.scheduling.base import SchedulingStrategy
-from src.domain.scheduler import Scheduler
-from src.domain.conflict import ConflictDetector
-from src.domain.task import Task, TaskConstraints, EnergyLevel, ZoneType
-from src.domain.timeblock import TimeBlock, TimeBlockZone, TimeBlockType, Event
+from src_.domain.scheduling.strategies import SequenceBasedStrategy
+from src_.domain.scheduling.base import SchedulingStrategy
+from src_.domain.scheduler import Scheduler
+from src_.domain.conflict import ConflictDetector
+from src_.domain.task import Task, TaskConstraints, EnergyLevel, ZoneType
+from src_.domain.timeblock import TimeBlock, TimeBlockZone, TimeBlockType, Event
 
 class MockTaskRepository:
     def __init__(self, tasks=None):

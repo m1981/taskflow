@@ -2,12 +2,12 @@
 import pytest
 from datetime import datetime, timedelta
 from typing import List
-from src.domain.task import Task, TaskConstraints, ZoneType, EnergyLevel
-from src.domain.scheduler import Scheduler
-from src.domain.timeblock import TimeBlockZone, Event, TimeBlockType
-from src.domain.scheduling import SequenceBasedStrategy
+from src_.domain.task import Task, TaskConstraints, ZoneType, EnergyLevel
+from src_.domain.scheduler import Scheduler
+from src_.domain.timeblock import TimeBlockZone, Event, TimeBlockType
+from src_.domain.scheduling import SequenceBasedStrategy
 from unittest.mock import Mock
-from src.domain.scheduling.strategies import SequenceBasedStrategy
+from src_.domain.scheduling.strategies import SequenceBasedStrategy
 
 @pytest.fixture
 def work_day_zones():

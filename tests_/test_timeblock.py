@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
-from src.domain.timeblock import TimeBlock, TimeBlockZone, TimeBlockType, Event
-from src.domain.task import ZoneType, EnergyLevel
+from src_.domain.timeblock import TimeBlock, TimeBlockZone, TimeBlockType, Event
+from src_.domain.task import ZoneType, EnergyLevel
 
 class TestTimeBlockAvailability:
     @pytest.fixture

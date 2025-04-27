@@ -1,7 +1,7 @@
 from datetime import datetime
-from src.domain.task import Task, TaskConstraints, ZoneType, EnergyLevel
-from src.domain.timeblock import TimeBlockZone
-from src.domain.conflict import ConflictDetector
+from src_.domain.task import Task, TaskConstraints, ZoneType, EnergyLevel
+from src_.domain.timeblock import TimeBlockZone
+from src_.domain.conflict import ConflictDetector
 
 def test_zone_transition_conflicts():
     """

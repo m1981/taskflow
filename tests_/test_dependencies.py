@@ -1,8 +1,8 @@
 import pytest
 from datetime import datetime, timedelta
-from src.domain.task import Task, TaskConstraints, ZoneType, EnergyLevel
-from src.domain.scheduler import Scheduler, SchedulingStrategy
-from src.domain.timeblock import TimeBlockZone, Event, TimeBlockType
+from src_.domain.task import Task, TaskConstraints, ZoneType, EnergyLevel
+from src_.domain.scheduler import Scheduler, SchedulingStrategy
+from src_.domain.timeblock import TimeBlockZone, Event, TimeBlockType
 
 class DependencyAwareStrategy(SchedulingStrategy):
     def schedule(self, tasks, zones, existing_events):

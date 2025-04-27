@@ -1,7 +1,7 @@
 import pytest
 import dataclasses
 from datetime import datetime, timedelta
-from src.domain.task import Task, TaskConstraints, EnergyLevel, ZoneType
+from src_.domain.task import Task, TaskConstraints, EnergyLevel, ZoneType
 
 class TestTaskValidation:
     @pytest.fixture

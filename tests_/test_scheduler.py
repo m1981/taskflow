@@ -1,8 +1,8 @@
 import pytest
 from datetime import datetime, timedelta
-from src.domain.scheduler import Scheduler, SchedulingStrategy
-from src.domain.task import Task
-from src.domain.timeblock import TimeBlockZone, Event
+from src_.domain.scheduler import Scheduler, SchedulingStrategy
+from src_.domain.task import Task
+from src_.domain.timeblock import TimeBlockZone, Event
 
 class SimpleSchedulingStrategy(SchedulingStrategy):
     def schedule(self, tasks, zones, existing_events):

@@ -21,7 +21,7 @@ services:
     environment:
       - PYTHONPATH=/app/src
     command: >
-      sh -c "cd apps/taskflow &&
+      sh -c "
       coverage run -m pytest tests/ &&
       coverage report -m &&
       coverage html"
