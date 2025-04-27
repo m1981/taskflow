@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import streamlit as st
 from todoist_api_python.api import TodoistAPI
 import pandas as pd
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -116,8 +115,8 @@ def main():
         # Build the markdown table
         table_lines = []
         # Add table header
-        table_lines.append("| Project | Section | Task | Labels | Due Date |")
-        table_lines.append("|---------|----------|------|--------|----------|")
+        table_lines.append("| Project | Task ID | Project ID | Section ID | Parent ID | Section | Task | Labels | Due Date |")
+        table_lines.append("|---------|---------|------------|------------|-----------|----------|------|--------|----------|")
 
         for project in organized_items:
             project_tasks = tasks_by_project.get(project.id, [])
@@ -131,7 +130,10 @@ def main():
                     project_name = escape_markdown(project.name)
                     task_content = escape_markdown(truncate_text(task.content))
                     labels_str = escape_markdown(labels_str)
-                    line = f"| {project_name} | - | {task_content} | {labels_str} | {due_str} |"
+                    
+                    line = (f"| {project_name} | {task.id} | {task.project_id} | "
+                           f"{task.section_id or '-'} | {task.parent_id or '-'} | - | "
+                           f"{task_content} | {labels_str} | {due_str} |")
                     table_lines.append(line)
             
             # Section tasks
@@ -145,7 +147,10 @@ def main():
                     section_name = escape_markdown(section.name)
                     task_content = escape_markdown(truncate_text(task.content))
                     labels_str = escape_markdown(labels_str)
-                    line = f"| {project_name} | {section_name} | {task_content} | {labels_str} | {due_str} |"
+                    
+                    line = (f"| {project_name} | {task.id} | {task.project_id} | "
+                           f"{task.section_id} | {task.parent_id or '-'} | {section_name} | "
+                           f"{task_content} | {labels_str} | {due_str} |")
                     table_lines.append(line)
 
         # Display the markdown table
