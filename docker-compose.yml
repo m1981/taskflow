@@ -20,4 +20,4 @@ services:
       - ./:/app
     environment:
       - PYTHONPATH=/app
-    command: ptw -- -vv tests/
+    command: ptw --ignore=.git --ignore=__pycache__ src tests -- -vv tests/

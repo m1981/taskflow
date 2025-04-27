@@ -1,6 +1,6 @@
 from dataclasses import FrozenInstanceError
 import pytest
-from src.domain.result import Result, Success, Error
+from src.domain.result import Result, Success, Error, success, error
 
 def test_success_result_with_data():
     result = Success(data="test data")
@@ -25,13 +25,13 @@ def test_result_immutability():
     with pytest.raises(FrozenInstanceError):
         result.data = "modified"
 
-def test_result_factory_success():
-    result = Result.success("test data")
+def test_success_factory():
+    result = success("test data")
     assert isinstance(result, Success)
     assert result.data == "test data"
 
-def test_result_factory_error():
-    result = Result.error("error message")
+def test_error_factory():
+    result = error("error message")
     assert isinstance(result, Error)
     assert result.error == "error message"
 

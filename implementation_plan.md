@@ -1,5 +1,6 @@
 Let me help you envision a workflow that combines TaskFlow, AI, and your mobile Todoist usage. Here's how I imagine it could work effectively:
 
+
 1. Task Capture Phase (Mobile):
 - Throughout your day, you quickly capture tasks in your Todoist inbox using your mobile app
 - You don't worry about organizing them at this point - just rapid capture
@@ -31,7 +32,25 @@ Let me help you envision a workflow that combines TaskFlow, AI, and your mobile 
 - Manually adjust any misclassified tasks
 - Add additional context or labels if needed
 
-
+```mermaid
+sequenceDiagram
+    participant UI as Streamlit UI
+    participant Orchestrator as ChangeOrchestrator
+    participant AI as AI Analyzer
+    participant Diff as DiffGenerator
+    participant Todoist as Todoist API
+    
+    UI->>Orchestrator: Request task analysis
+    Orchestrator->>Todoist: Fetch inbox tasks
+    Todoist-->>Orchestrator: Tasks
+    Orchestrator->>AI: Analyze tasks
+    AI-->>Orchestrator: Suggested changes
+    Orchestrator->>Diff: Generate diff view
+    Diff-->>UI: Formatted changes
+    UI->>Orchestrator: Approve changes
+    Orchestrator->>Todoist: Apply changes
+    Todoist-->>UI: Confirmation
+```
 
 ```mermaid
 classDiagram
@@ -143,23 +162,23 @@ class Result~T~ {
 
 I'll outline the implementation order with test cases, following the outside-in TDD approach while maintaining the ability to work with isolated components.
 
-1. **Core Domain Objects (Value Objects)**
+1. ✅ **Core Domain Objects (Value Objects)**
 ```python
-# Test cases for Task
+# Test cases for Task ✅
 - should create task with minimal required fields
 - should create task with all optional fields
 - should not allow modification after creation
 - should properly handle None values for optional fields
 
-# Test cases for TaskUpdate
+# Test cases for TaskUpdate ✅
 - should create update with minimal required fields
 - should validate project_id is not empty
 - should handle optional fields properly
 ```
 
-2. **Result Type (Infrastructure)**
+2. ✅ **Result Type (Infrastructure)**
 ```python
-# Test cases for Result
+# Test cases for Result ✅
 - should create success result with data
 - should create error result with message
 - should handle None data for success case
@@ -167,9 +186,9 @@ I'll outline the implementation order with test cases, following the outside-in 
 - should be immutable after creation
 ```
 
-3. **TodoistRepository Interface with Mock Implementation**
+3. ✅ **TodoistRepository Interface with Mock Implementation**
 ```python
-# Test cases for MockTodoistRepository
+# Test cases for MockTodoistRepository ✅
 - should return inbox tasks only
 - should return all projects
 - should handle empty lists
@@ -178,9 +197,9 @@ I'll outline the implementation order with test cases, following the outside-in 
 - should track update operations
 ```
 
-4. **TaskValidator**
+4. ✅ **TaskValidator**
 ```python
-# Test cases for TaskValidator
+# Test cases for TaskValidator ✅
 - should validate task update against available projects
 - should reject updates with non-existent project_id
 - should validate section_id belongs to project
@@ -257,5 +276,7 @@ Development Process:
 6. Improve error handling
 7. Add logging
 8. Performance optimization
+
+
 
 Would you like me to start with implementing any specific component or elaborate on any test cases?
