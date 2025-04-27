@@ -6,29 +6,32 @@ from todoist_api_python.api import TodoistAPI
 # Load environment variables from .env file
 load_dotenv()
 
-def get_project_descriptions(api, projects):
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def get_all_data(_api):
+    """Cached version of data fetching"""
+    projects = _api.get_projects()
+    all_tasks = _api.get_tasks()  # Gets ALL tasks at once
+    
+    # Create task maps
+    tasks_by_project = {}
+    for task in all_tasks:
+        project_id = task.project_id
+        if project_id not in tasks_by_project:
+            tasks_by_project[project_id] = []
+        tasks_by_project[project_id].append(task)
+    
+    # Get descriptions from tasks
     project_descriptions = {}
     for project in projects:
-        tasks = api.get_tasks(project_id=project.id)
-
-        description_found = False
-        for task in tasks:
-            if task.content == "Description":
-                if task.description:
-                    project_descriptions[project.id] = task.description
-                    description_found = True
-                    break
-
-        if not description_found:
-            project_descriptions[project.id] = "-----------------"
-
-    return project_descriptions
-
-def get_project_tasks(api, project_id):
-    return api.get_tasks(project_id=project_id)
-
-def get_project_sections(api, project_id):
-    return api.get_sections(project_id=project_id)
+        project_tasks = tasks_by_project.get(project.id, [])
+        description = next(
+            (task.description for task in project_tasks 
+             if task.content == "Description" and task.description),
+            "-----------------"
+        )
+        project_descriptions[project.id] = description
+    
+    return projects, tasks_by_project, project_descriptions
 
 def organize_projects_and_sections(projects):
     organized_items = []
@@ -78,10 +81,18 @@ def main():
     try:
         api = TodoistAPI(api_key)
 
-        with st.spinner("Loading projects..."):
-            projects = api.get_projects()
-            project_descriptions = get_project_descriptions(api, projects)
+        with st.spinner("Loading Todoist data..."):
+            progress_bar = st.progress(0)
+            
+            # Fetch data
+            progress_bar.progress(20)
+            projects, tasks_by_project, project_descriptions = get_all_data(api)
+            
+            progress_bar.progress(60)
             organized_items = organize_projects_and_sections(projects)
+            
+            progress_bar.progress(100)
+            progress_bar.empty()
 
         with st.expander("All Projects", expanded=True):
             for item in organized_items:
@@ -93,19 +104,30 @@ def main():
                 with col2:
                     st.markdown(project_descriptions[item.id])
                 
-                # Add this section to show tasks and sections
-                sections = get_project_sections(api, item.id)
-                tasks = get_project_tasks(api, item.id)
+                # Use pre-fetched tasks
+                project_tasks = tasks_by_project.get(item.id, [])
                 
-                # Show tasks without sections
-                unsectioned_tasks = [t for t in tasks if not t.section_id]
+                # Group tasks by section
+                tasks_by_section = {}
+                unsectioned_tasks = []
+                for task in project_tasks:
+                    if task.section_id:
+                        if task.section_id not in tasks_by_section:
+                            tasks_by_section[task.section_id] = []
+                        tasks_by_section[task.section_id].append(task)
+                    else:
+                        unsectioned_tasks.append(task)
+                
+                # Show unsectioned tasks
                 for task in unsectioned_tasks:
-                    st.markdown(f"{indent}  • {task.content}")
+                    if task.content != "Description":  # Skip description tasks
+                        st.markdown(f"{indent}  • {task.content}")
                 
                 # Show sections and their tasks
+                sections = api.get_sections(project_id=item.id)
                 for section in sections:
                     st.markdown(f"{indent}  📑 **{section.name}**")
-                    section_tasks = [t for t in tasks if t.section_id == section.id]
+                    section_tasks = tasks_by_section.get(section.id, [])
                     for task in section_tasks:
                         st.markdown(f"{indent}    • {task.content}")
 
