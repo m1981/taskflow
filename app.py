@@ -1,8 +1,19 @@
+import streamlit as st
+# Must be the first Streamlit command
+st.set_page_config(
+    page_title="TaskFlow",
+    page_icon="📋",
+    layout="wide",
+    initial_sidebar_state="auto"
+)
+
 import os
 from dotenv import load_dotenv
-import streamlit as st
 from todoist_api_python.api import TodoistAPI
 import pandas as pd
+from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid.grid_options_builder import GridOptionsBuilder
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -92,20 +103,6 @@ def truncate_text(text, max_length=50):
         return text
     return (text[:max_length - 3] + '...') if len(text) > max_length else text
 
-def format_project_name(project_name, depth):
-    """Format project name with proper indentation"""
-    indent = "  " * depth  # Two spaces per depth level
-    return f"{indent}{project_name}"
-
-def format_tree_line(indent_level, is_last, text):
-    """Format a line in tree-style ASCII art"""
-    if indent_level == 0:
-        return text
-    
-    indent = "│   " * (indent_level - 1)
-    prefix = "└── " if is_last else "├── "
-    return f"{indent}{prefix}{text}"
-
 def main():
     st.title("📋 TaskFlow")
     
@@ -127,52 +124,77 @@ def main():
             projects, tasks_by_project, project_descriptions, sections_by_project = get_all_data(api)
             organized_items = organize_projects_and_sections(projects)
 
-        # Build the ASCII tree
-        tree_lines = []
-
-        for project_idx, project in enumerate(organized_items):
-            is_last_project = project_idx == len(organized_items) - 1
-            project_line = format_tree_line(project.depth, is_last_project, project.name)
-            tree_lines.append(project_line)
-            
+        # Convert your data to a pandas DataFrame
+        rows = []
+        for project in organized_items:
             project_tasks = tasks_by_project.get(project.id, [])
             
-            # Global tasks (no section)
+            # Define global tasks first
             global_tasks = [t for t in project_tasks if not t.section_id and t.content != "Description"]
-            sorted_global_tasks = sorted(global_tasks, key=lambda x: (x.order or 0, x.content))
             
+            # Add global tasks
+            for task in sorted(global_tasks, key=lambda x: (x.order or 0, x.content)):
+                rows.append({
+                    'Project': project.name,
+                    'Task ID': task.id,
+                    'Project ID': task.project_id,
+                    'Section ID': task.section_id or '-',
+                    'Parent ID': task.parent_id or '-',
+                    'Order': task.order or 0,
+                    'Section': '-',
+                    'Task': task.content,
+                    'Labels': ", ".join(task.labels) if task.labels else '',
+                    'Due Date': task.due.date if task.due else ''
+                })
+                
+            # Add section tasks
             sections = sections_by_project.get(project.id, [])
-            has_sections = bool(sections)
-            
-            # Process global tasks
-            for task_idx, task in enumerate(sorted_global_tasks):
-                is_last_task = (task_idx == len(sorted_global_tasks) - 1) and not has_sections
-                due_str = task.due.date if task.due else ''
-                labels_str = ", ".join(task.labels) if task.labels else ''
-                task_info = f"{task.content} [{labels_str}] {due_str}"
-                task_line = format_tree_line(project.depth + 1, is_last_task, task_info)
-                tree_lines.append(task_line)
-            
-            # Process sections and their tasks
-            sorted_sections = sorted(sections, key=lambda x: (x.order or 0, x.name))
-            for section_idx, section in enumerate(sorted_sections):
-                is_last_section = section_idx == len(sorted_sections) - 1
-                section_line = format_tree_line(project.depth + 1, is_last_section, f"[{section.name}]")
-                tree_lines.append(section_line)
-                
+            for section in sorted(sections, key=lambda x: (x.order or 0, x.name)):
                 section_tasks = [t for t in project_tasks if t.section_id == section.id]
-                sorted_section_tasks = sorted(section_tasks, key=lambda x: (x.order or 0, x.content))
-                
-                for task_idx, task in enumerate(sorted_section_tasks):
-                    is_last_task = task_idx == len(sorted_section_tasks) - 1
-                    due_str = task.due.date if task.due else ''
-                    labels_str = ", ".join(task.labels) if task.labels else ''
-                    task_info = f"{task.content} [{labels_str}] {due_str}"
-                    task_line = format_tree_line(project.depth + 2, is_last_task, task_info)
-                    tree_lines.append(task_line)
-
-        # Display as preformatted text
-        st.text("\n".join(tree_lines))
+                for task in sorted(section_tasks, key=lambda x: (x.order or 0, x.content)):
+                    rows.append({
+                        'Project': project.name,
+                        'Task ID': task.id,
+                        'Project ID': task.project_id,
+                        'Section ID': task.section_id,
+                        'Parent ID': task.parent_id or '-',
+                        'Order': task.order or 0,
+                        'Section': section.name,
+                        'Task': task.content,
+                        'Labels': ", ".join(task.labels) if task.labels else '',
+                        'Due Date': task.due.date if task.due else ''
+                    })
+        
+        df = pd.DataFrame(rows)
+        
+        # Configure grid options with wider columns and 200 rows per page
+        gb = GridOptionsBuilder.from_dataframe(df)
+        gb.configure_default_column(resizable=True, filterable=True, sorteable=True)
+        gb.configure_pagination(enabled=True, 
+                              paginationAutoPageSize=False, 
+                              paginationPageSize=200)  # Set to 200 results per page
+        
+        # Configure column widths
+        gb.configure_column('Project', minWidth=150)
+        gb.configure_column('Task ID', minWidth=100)
+        gb.configure_column('Project ID', minWidth=100)
+        gb.configure_column('Section ID', minWidth=100)
+        gb.configure_column('Parent ID', minWidth=100)
+        gb.configure_column('Order', minWidth=80)
+        gb.configure_column('Section', minWidth=150)
+        gb.configure_column('Task', minWidth=300)  # Make task column wider
+        gb.configure_column('Labels', minWidth=200)
+        gb.configure_column('Due Date', minWidth=120)
+        
+        grid_options = gb.build()
+        
+        # Display the grid with custom height
+        AgGrid(df, 
+               gridOptions=grid_options,
+               allow_unsafe_jscode=True,
+               theme='streamlit',
+               height=800,  # Set a fixed height for the grid
+               fit_columns_on_grid_load=True)  # Make columns fit the screen width
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
