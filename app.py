@@ -75,17 +75,6 @@ def format_task_line(task, project_name, section_name=""):
 def main():
     st.title("📋 TaskFlow")
     
-    # Add monospace font style
-    st.markdown("""
-        <style>
-        .monospace {
-            font-family: monospace;
-            white-space: pre;
-            font-size: 14px;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     with st.sidebar:
         api_key = st.text_input(
             "Todoist API Key",
@@ -106,8 +95,6 @@ def main():
 
         # Build the text output
         lines = []
-        lines.append("PROJECT             SECTION             TASK                                    LABELS              DUE DATE")
-        lines.append("=" * 100)
 
         for project in organized_items:
             project_tasks = tasks_by_project.get(project.id, [])
@@ -115,23 +102,22 @@ def main():
             # Global tasks (no section)
             for task in project_tasks:
                 if not task.section_id and task.content != "Description":
-                    due_str = task.due.date if task.due else ''
-                    labels_str = ", ".join(task.labels) if task.labels else ''
-                    line = f"{project.name:<20}{'-':<20}{task.content:<40}{labels_str:<20}{due_str}"
+                    due_str = f" - {task.due.date}" if task.due else ''
+                    labels_str = f" - {', '.join(task.labels)}" if task.labels else ''
+                    line = f"{project.name} - {task.content}{labels_str}{due_str}"
                     lines.append(line)
             
             # Section tasks
             for section in sections_by_project.get(project.id, []):
                 section_tasks = [t for t in project_tasks if t.section_id == section.id]
                 for task in section_tasks:
-                    due_str = task.due.date if task.due else ''
-                    labels_str = ", ".join(task.labels) if task.labels else ''
-                    line = f"{project.name:<20}{section.name:<20}{task.content:<40}{labels_str:<20}{due_str}"
+                    due_str = f" - {task.due.date}" if task.due else ''
+                    labels_str = f" - {', '.join(task.labels)}" if task.labels else ''
+                    line = f"{project.name} - {section.name} - {task.content}{labels_str}{due_str}"
                     lines.append(line)
 
-        # Display the output in monospace format
-        output_text = "\n".join(lines)
-        st.markdown(f'<pre class="monospace">{output_text}</pre>', unsafe_allow_html=True)
+        # Display the output
+        st.text("\n".join(lines))
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
