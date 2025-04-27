@@ -115,15 +115,14 @@ def main():
 
         # Build the markdown table
         table_lines = []
-        # Add table header
-        table_lines.append("| Project | Task ID | Project ID | Section ID | Parent ID | Section | Task | Labels | Due Date |")
-        table_lines.append("|---------|---------|------------|------------|-----------|----------|------|--------|----------|")
+        # Add table header with Order column
+        table_lines.append("| Project | Task ID | Project ID | Section ID | Parent ID | Order | Section | Task | Labels | Due Date |")
+        table_lines.append("|---------|---------|------------|------------|-----------|-------|----------|------|--------|----------|")
 
         for project in organized_items:
             project_tasks = tasks_by_project.get(project.id, [])
             
             # Global tasks (no section)
-            # Sort tasks by order
             global_tasks = [t for t in project_tasks if not t.section_id and t.content != "Description"]
             for task in sorted(global_tasks, key=lambda x: (x.order or 0, x.content)):
                 due_str = task.due.date if task.due else ''
@@ -133,16 +132,15 @@ def main():
                 labels_str = escape_markdown(labels_str)
                 
                 line = (f"| {project_name} | {task.id} | {task.project_id} | "
-                       f"{task.section_id or '-'} | {task.parent_id or '-'} | - | "
+                       f"{task.section_id or '-'} | {task.parent_id or '-'} | "
+                       f"{task.order or 0} | - | "
                        f"{task_content} | {labels_str} | {due_str} |")
                 table_lines.append(line)
             
             # Section tasks
-            # Sort sections by order
             sections = sections_by_project.get(project.id, [])
             for section in sorted(sections, key=lambda x: (x.order or 0, x.name)):
                 section_tasks = [t for t in project_tasks if t.section_id == section.id]
-                # Sort tasks within section by order
                 for task in sorted(section_tasks, key=lambda x: (x.order or 0, x.content)):
                     due_str = task.due.date if task.due else ''
                     labels_str = ", ".join(task.labels) if task.labels else ''
@@ -152,7 +150,8 @@ def main():
                     labels_str = escape_markdown(labels_str)
                     
                     line = (f"| {project_name} | {task.id} | {task.project_id} | "
-                           f"{task.section_id} | {task.parent_id or '-'} | {section_name} | "
+                           f"{task.section_id} | {task.parent_id or '-'} | "
+                           f"{task.order or 0} | {section_name} | "
                            f"{task_content} | {labels_str} | {due_str} |")
                     table_lines.append(line)
 
