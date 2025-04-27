@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import streamlit as st
 from todoist_api_python.api import TodoistAPI
+import pandas as pd
 
 # Load environment variables from .env file
 load_dotenv()
@@ -10,15 +11,33 @@ load_dotenv()
 def get_all_data(_api):
     """Cached version of data fetching"""
     projects = _api.get_projects()
-    all_tasks = _api.get_tasks()  # Gets ALL tasks at once
+    all_tasks = _api.get_tasks()
+    all_sections = _api.get_sections()  # Get ALL sections at once
     
     # Create task maps
     tasks_by_project = {}
+    tasks_by_section = {}
     for task in all_tasks:
+        # Map by project
         project_id = task.project_id
         if project_id not in tasks_by_project:
             tasks_by_project[project_id] = []
         tasks_by_project[project_id].append(task)
+        
+        # Map by section
+        section_id = task.section_id
+        if section_id:
+            if section_id not in tasks_by_section:
+                tasks_by_section[section_id] = []
+            tasks_by_section[section_id].append(task)
+    
+    # Map sections by project
+    sections_by_project = {}
+    for section in all_sections:
+        project_id = section.project_id
+        if project_id not in sections_by_project:
+            sections_by_project[project_id] = []
+        sections_by_project[project_id].append(section)
     
     # Get descriptions from tasks
     project_descriptions = {}
@@ -31,7 +50,7 @@ def get_all_data(_api):
         )
         project_descriptions[project.id] = description
     
-    return projects, tasks_by_project, project_descriptions
+    return projects, tasks_by_project, project_descriptions, sections_by_project
 
 def organize_projects_and_sections(projects):
     organized_items = []
@@ -47,32 +66,32 @@ def organize_projects_and_sections(projects):
     add_items(None, 0)
     return organized_items
 
+def format_task_line(task, project_name, section_name=""):
+    due_date = task.due.date if task.due else ''
+    labels = ", ".join(task.labels) if task.labels else ""
+    section_name = section_name.ljust(20)
+    return f"{project_name.ljust(20)} {section_name} {task.content.ljust(50)} {labels.ljust(20)} {due_date}"
+
 def main():
     st.title("📋 TaskFlow")
-
+    
+    # Add monospace font style
     st.markdown("""
         <style>
-        .project-item {
-            padding: 5px;
-            border-radius: 5px;
-            margin: 2px 0;
-        }
-        .project-description {
-            color: #666;
-            font-style: italic;
+        .monospace {
+            font-family: monospace;
+            white-space: pre;
+            font-size: 14px;
         }
         </style>
     """, unsafe_allow_html=True)
-    st.markdown("*Intelligent task scheduling and time blocking*")
 
     with st.sidebar:
-        st.header("Configuration")
         api_key = st.text_input(
             "Todoist API Key",
-            value=os.getenv('TODOIST_API_KEY', ''),  # Changed from TODOIST_KEY to TODOIST_API_KEY
+            value=os.getenv('TODOIST_API_KEY', ''),
             type="password"
         )
-        st.markdown("*Get your API key from [Todoist Settings](https://todoist.com/app/settings/integrations)*")
 
     if not api_key:
         st.warning("Please enter your Todoist API key in the sidebar")
@@ -80,60 +99,42 @@ def main():
 
     try:
         api = TodoistAPI(api_key)
-
+        
         with st.spinner("Loading Todoist data..."):
-            progress_bar = st.progress(0)
-            
-            # Fetch data
-            progress_bar.progress(20)
-            projects, tasks_by_project, project_descriptions = get_all_data(api)
-            
-            progress_bar.progress(60)
+            projects, tasks_by_project, project_descriptions, sections_by_project = get_all_data(api)
             organized_items = organize_projects_and_sections(projects)
-            
-            progress_bar.progress(100)
-            progress_bar.empty()
 
-        with st.expander("All Projects", expanded=True):
-            for item in organized_items:
-                indent = "    " * item.depth
-                
-                col1, col2 = st.columns([2, 3])
-                with col1:
-                    st.markdown(f"**{item.name}**")
-                with col2:
-                    st.markdown(project_descriptions[item.id])
-                
-                # Use pre-fetched tasks
-                project_tasks = tasks_by_project.get(item.id, [])
-                
-                # Group tasks by section
-                tasks_by_section = {}
-                unsectioned_tasks = []
-                for task in project_tasks:
-                    if task.section_id:
-                        if task.section_id not in tasks_by_section:
-                            tasks_by_section[task.section_id] = []
-                        tasks_by_section[task.section_id].append(task)
-                    else:
-                        unsectioned_tasks.append(task)
-                
-                # Show unsectioned tasks
-                for task in unsectioned_tasks:
-                    if task.content != "Description":  # Skip description tasks
-                        st.markdown(f"{indent}  • {task.content}")
-                
-                # Show sections and their tasks
-                sections = api.get_sections(project_id=item.id)
-                for section in sections:
-                    st.markdown(f"{indent}  📑 **{section.name}**")
-                    section_tasks = tasks_by_section.get(section.id, [])
-                    for task in section_tasks:
-                        st.markdown(f"{indent}    • {task.content}")
+        # Build the text output
+        lines = []
+        lines.append("PROJECT             SECTION             TASK                                    LABELS              DUE DATE")
+        lines.append("=" * 100)
+
+        for project in organized_items:
+            project_tasks = tasks_by_project.get(project.id, [])
+            
+            # Global tasks (no section)
+            for task in project_tasks:
+                if not task.section_id and task.content != "Description":
+                    due_str = task.due.date if task.due else ''
+                    labels_str = ", ".join(task.labels) if task.labels else ''
+                    line = f"{project.name:<20}{'-':<20}{task.content:<40}{labels_str:<20}{due_str}"
+                    lines.append(line)
+            
+            # Section tasks
+            for section in sections_by_project.get(project.id, []):
+                section_tasks = [t for t in project_tasks if t.section_id == section.id]
+                for task in section_tasks:
+                    due_str = task.due.date if task.due else ''
+                    labels_str = ", ".join(task.labels) if task.labels else ''
+                    line = f"{project.name:<20}{section.name:<20}{task.content:<40}{labels_str:<20}{due_str}"
+                    lines.append(line)
+
+        # Display the output in monospace format
+        output_text = "\n".join(lines)
+        st.markdown(f'<pre class="monospace">{output_text}</pre>', unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
-        st.error("Please check your API key and try again")
 
 if __name__ == '__main__':
     main()
