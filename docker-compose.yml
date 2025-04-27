@@ -19,9 +19,5 @@ services:
     volumes:
       - ./:/app
     environment:
-      - PYTHONPATH=/app/src
-    command: >
-      sh -c "
-      coverage run -m pytest tests/ &&
-      coverage report -m &&
-      coverage html"
+      - PYTHONPATH=/app
+    command: ptw -- -vv tests/
