@@ -1,29 +1,32 @@
 from dataclasses import dataclass
-from typing import Optional, Generic, TypeVar, Union
+from typing import Optional, Generic, TypeVar
 
 T = TypeVar('T')
 
 @dataclass(frozen=True)
-class Success(Generic[T]):
-    """Represents a successful result with optional data"""
-    data: Optional[T] = None
-    success: bool = True
+class Result(Generic[T]):
+    """Generic result type for handling success/error cases"""
+    success: bool
     error: Optional[str] = None
+    data: Optional[T] = None
 
 @dataclass(frozen=True)
-class Error(Generic[T]):
-    """Represents a failed result with error message"""
-    error: str
+class Success(Result[T]):
+    """Represents a successful result"""
+    success: bool = True
+    error: Optional[str] = None
+    data: Optional[T] = None
+
+@dataclass(frozen=True)
+class Error(Result[T]):
+    """Represents an error result"""
     success: bool = False
     data: Optional[T] = None
 
-# Type alias for union of Success and Error
-Result = Union[Success[T], Error[T]]
-
-def success(data: Optional[T] = None) -> Success[T]:
-    """Create a successful result"""
+def success(data: T) -> Success[T]:
+    """Create a successful result with data"""
     return Success(data=data)
 
-def error(message: str) -> Error[T]:
-    """Create an error result"""
+def error(message: str) -> Error:
+    """Create an error result with message"""
     return Error(error=message)
