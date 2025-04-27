@@ -86,6 +86,12 @@ def escape_markdown(text):
         text = text.replace(char, f"\\{char}")
     return text
 
+def truncate_text(text, max_length=50):
+    """Truncate text to max_length characters, adding ellipsis if needed"""
+    if not isinstance(text, str):
+        return text
+    return (text[:max_length - 3] + '...') if len(text) > max_length else text
+
 def main():
     st.title("📋 TaskFlow")
     
@@ -121,9 +127,9 @@ def main():
                 if not task.section_id and task.content != "Description":
                     due_str = task.due.date if task.due else ''
                     labels_str = ", ".join(task.labels) if task.labels else ''
-                    # Escape special characters in all fields
+                    # Escape special characters and truncate task content
                     project_name = escape_markdown(project.name)
-                    task_content = escape_markdown(task.content)
+                    task_content = escape_markdown(truncate_text(task.content))
                     labels_str = escape_markdown(labels_str)
                     line = f"| {project_name} | - | {task_content} | {labels_str} | {due_str} |"
                     table_lines.append(line)
@@ -134,10 +140,10 @@ def main():
                 for task in section_tasks:
                     due_str = task.due.date if task.due else ''
                     labels_str = ", ".join(task.labels) if task.labels else ''
-                    # Escape special characters in all fields
+                    # Escape special characters and truncate task content
                     project_name = escape_markdown(project.name)
                     section_name = escape_markdown(section.name)
-                    task_content = escape_markdown(task.content)
+                    task_content = escape_markdown(truncate_text(task.content))
                     labels_str = escape_markdown(labels_str)
                     line = f"| {project_name} | {section_name} | {task_content} | {labels_str} | {due_str} |"
                     table_lines.append(line)
