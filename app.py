@@ -72,6 +72,20 @@ def format_task_line(task, project_name, section_name=""):
     section_name = section_name.ljust(20)
     return f"{project_name.ljust(20)} {section_name} {task.content.ljust(50)} {labels.ljust(20)} {due_date}"
 
+def escape_markdown(text):
+    """Escape special characters that could break markdown table formatting"""
+    if not isinstance(text, str):
+        return text
+    # Escape pipes, which are table separators in markdown
+    text = text.replace("|", "\\|")
+    # Replace tabs and multiple spaces with a single space
+    text = " ".join(text.split())
+    # Escape other special markdown characters if needed
+    special_chars = ['*', '_', '[', ']', '(', ')', '#', '+', '-', '.', '!']
+    for char in special_chars:
+        text = text.replace(char, f"\\{char}")
+    return text
+
 def main():
     st.title("📋 TaskFlow")
     
@@ -93,8 +107,11 @@ def main():
             projects, tasks_by_project, project_descriptions, sections_by_project = get_all_data(api)
             organized_items = organize_projects_and_sections(projects)
 
-        # Build the text output
-        lines = []
+        # Build the markdown table
+        table_lines = []
+        # Add table header
+        table_lines.append("| Project | Section | Task | Labels | Due Date |")
+        table_lines.append("|---------|----------|------|--------|----------|")
 
         for project in organized_items:
             project_tasks = tasks_by_project.get(project.id, [])
@@ -102,22 +119,31 @@ def main():
             # Global tasks (no section)
             for task in project_tasks:
                 if not task.section_id and task.content != "Description":
-                    due_str = f" - {task.due.date}" if task.due else ''
-                    labels_str = f" - {', '.join(task.labels)}" if task.labels else ''
-                    line = f"{project.name} - {task.content}{labels_str}{due_str}"
-                    lines.append(line)
+                    due_str = task.due.date if task.due else ''
+                    labels_str = ", ".join(task.labels) if task.labels else ''
+                    # Escape special characters in all fields
+                    project_name = escape_markdown(project.name)
+                    task_content = escape_markdown(task.content)
+                    labels_str = escape_markdown(labels_str)
+                    line = f"| {project_name} | - | {task_content} | {labels_str} | {due_str} |"
+                    table_lines.append(line)
             
             # Section tasks
             for section in sections_by_project.get(project.id, []):
                 section_tasks = [t for t in project_tasks if t.section_id == section.id]
                 for task in section_tasks:
-                    due_str = f" - {task.due.date}" if task.due else ''
-                    labels_str = f" - {', '.join(task.labels)}" if task.labels else ''
-                    line = f"{project.name} - {section.name} - {task.content}{labels_str}{due_str}"
-                    lines.append(line)
+                    due_str = task.due.date if task.due else ''
+                    labels_str = ", ".join(task.labels) if task.labels else ''
+                    # Escape special characters in all fields
+                    project_name = escape_markdown(project.name)
+                    section_name = escape_markdown(section.name)
+                    task_content = escape_markdown(task.content)
+                    labels_str = escape_markdown(labels_str)
+                    line = f"| {project_name} | {section_name} | {task_content} | {labels_str} | {due_str} |"
+                    table_lines.append(line)
 
-        # Display the output
-        st.text("\n".join(lines))
+        # Display the markdown table
+        st.markdown("\n".join(table_lines))
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
