@@ -8,11 +8,13 @@ st.set_page_config(
 )
 
 import os
+import time
 from dotenv import load_dotenv
 from todoist_api_python.api import TodoistAPI
 import pandas as pd
-from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 from st_aggrid.grid_options_builder import GridOptionsBuilder
+import streamlit.components.v1 as components
 
 # Load environment variables from .env file
 load_dotenv()
@@ -124,9 +126,12 @@ def main():
             projects, tasks_by_project, project_descriptions, sections_by_project = get_all_data(api)
             organized_items = organize_projects_and_sections(projects)
 
+        # Filter for only "Test" project
+        test_projects = [p for p in organized_items if p.name == "Test"]
+        
         # Convert your data to a pandas DataFrame
         rows = []
-        for project in organized_items:
+        for project in test_projects:
             project_tasks = tasks_by_project.get(project.id, [])
             
             # Define global tasks first
@@ -165,14 +170,21 @@ def main():
                         'Due Date': task.due.date if task.due else ''
                     })
         
+        if not rows:
+            st.warning("No project named 'Test' found or no tasks in the Test project")
+            return
+            
         df = pd.DataFrame(rows)
         
-        # Configure grid options with wider columns and 200 rows per page
+        # Configure grid options
         gb = GridOptionsBuilder.from_dataframe(df)
         gb.configure_default_column(resizable=True, filterable=True, sorteable=True)
         gb.configure_pagination(enabled=True, 
                               paginationAutoPageSize=False, 
-                              paginationPageSize=200)  # Set to 200 results per page
+                              paginationPageSize=200)
+        
+        # Add checkbox selection
+        gb.configure_selection(selection_mode='multiple', use_checkbox=True)
         
         # Configure column widths
         gb.configure_column('Project', minWidth=150)
@@ -182,19 +194,76 @@ def main():
         gb.configure_column('Parent ID', minWidth=100)
         gb.configure_column('Order', minWidth=80)
         gb.configure_column('Section', minWidth=150)
-        gb.configure_column('Task', minWidth=300)  # Make task column wider
+        gb.configure_column('Task', minWidth=300)
         gb.configure_column('Labels', minWidth=200)
         gb.configure_column('Due Date', minWidth=120)
         
         grid_options = gb.build()
         
-        # Display the grid with custom height
-        AgGrid(df, 
-               gridOptions=grid_options,
-               allow_unsafe_jscode=True,
-               theme='streamlit',
-               height=800,  # Set a fixed height for the grid
-               fit_columns_on_grid_load=True)  # Make columns fit the screen width
+        # Display the grid and get the response FIRST
+        grid_response = AgGrid(df, 
+                             gridOptions=grid_options,
+                             allow_unsafe_jscode=True,
+                             theme='streamlit',
+                             height=800,
+                             fit_columns_on_grid_load=True)
+
+        # Now add action buttons AFTER grid is displayed
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("Close Selected Tasks"):
+                selected_rows = grid_response['selected_rows']
+                if selected_rows:
+                    with st.spinner("Closing selected tasks..."):
+                        for row in selected_rows:
+                            try:
+                                api.close_task(task_id=row['Task ID'])
+                                st.success(f"Closed task: {row['Task']}")
+                            except Exception as e:
+                                st.error(f"Failed to close task {row['Task']}: {str(e)}")
+                        time.sleep(1)  # Small delay to ensure UI updates
+                        st.rerun()
+                else:
+                    st.warning("No tasks selected")
+
+        with col2:
+            if st.button("Delete Selected Tasks"):
+                selected_rows = grid_response['selected_rows']
+                if selected_rows:
+                    with st.spinner("Deleting selected tasks..."):
+                        for row in selected_rows:
+                            try:
+                                api.delete_task(task_id=row['Task ID'])
+                                st.success(f"Deleted task: {row['Task']}")
+                            except Exception as e:
+                                st.error(f"Failed to delete task {row['Task']}: {str(e)}")
+                        time.sleep(1)  # Small delay to ensure UI updates
+                        st.rerun()
+                else:
+                    st.warning("No tasks selected")
+
+        with col3:
+            if st.button("Add Label to Selected"):
+                selected_rows = grid_response['selected_rows']
+                if selected_rows:
+                    label = st.text_input("Enter label name:")
+                    if label and st.button("Apply Label"):
+                        with st.spinner("Applying label..."):
+                            for row in selected_rows:
+                                try:
+                                    current_labels = row['Labels'].split(", ") if row['Labels'] else []
+                                    current_labels.append(label)
+                                    api.update_task(
+                                        task_id=row['Task ID'],
+                                        labels=list(set(current_labels))
+                                    )
+                                    st.success(f"Added label to task: {row['Task']}")
+                                except Exception as e:
+                                    st.error(f"Failed to add label to task {row['Task']}: {str(e)}")
+                            time.sleep(1)  # Small delay to ensure UI updates
+                            st.rerun()
+                else:
+                    st.warning("No tasks selected")
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
