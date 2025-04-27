@@ -92,6 +92,20 @@ def truncate_text(text, max_length=50):
         return text
     return (text[:max_length - 3] + '...') if len(text) > max_length else text
 
+def format_project_name(project_name, depth):
+    """Format project name with proper indentation"""
+    indent = "  " * depth  # Two spaces per depth level
+    return f"{indent}{project_name}"
+
+def format_tree_line(indent_level, is_last, text):
+    """Format a line in tree-style ASCII art"""
+    if indent_level == 0:
+        return text
+    
+    indent = "│   " * (indent_level - 1)
+    prefix = "└── " if is_last else "├── "
+    return f"{indent}{prefix}{text}"
+
 def main():
     st.title("📋 TaskFlow")
     
@@ -113,50 +127,52 @@ def main():
             projects, tasks_by_project, project_descriptions, sections_by_project = get_all_data(api)
             organized_items = organize_projects_and_sections(projects)
 
-        # Build the markdown table
-        table_lines = []
-        # Add table header with Order column
-        table_lines.append("| Project | Task ID | Project ID | Section ID | Parent ID | Order | Section | Task | Labels | Due Date |")
-        table_lines.append("|---------|---------|------------|------------|-----------|-------|----------|------|--------|----------|")
+        # Build the ASCII tree
+        tree_lines = []
 
-        for project in organized_items:
+        for project_idx, project in enumerate(organized_items):
+            is_last_project = project_idx == len(organized_items) - 1
+            project_line = format_tree_line(project.depth, is_last_project, project.name)
+            tree_lines.append(project_line)
+            
             project_tasks = tasks_by_project.get(project.id, [])
             
             # Global tasks (no section)
             global_tasks = [t for t in project_tasks if not t.section_id and t.content != "Description"]
-            for task in sorted(global_tasks, key=lambda x: (x.order or 0, x.content)):
+            sorted_global_tasks = sorted(global_tasks, key=lambda x: (x.order or 0, x.content))
+            
+            sections = sections_by_project.get(project.id, [])
+            has_sections = bool(sections)
+            
+            # Process global tasks
+            for task_idx, task in enumerate(sorted_global_tasks):
+                is_last_task = (task_idx == len(sorted_global_tasks) - 1) and not has_sections
                 due_str = task.due.date if task.due else ''
                 labels_str = ", ".join(task.labels) if task.labels else ''
-                project_name = escape_markdown(project.name)
-                task_content = escape_markdown(truncate_text(task.content))
-                labels_str = escape_markdown(labels_str)
-                
-                line = (f"| {project_name} | {task.id} | {task.project_id} | "
-                       f"{task.section_id or '-'} | {task.parent_id or '-'} | "
-                       f"{task.order or 0} | - | "
-                       f"{task_content} | {labels_str} | {due_str} |")
-                table_lines.append(line)
+                task_info = f"{task.content} [{labels_str}] {due_str}"
+                task_line = format_tree_line(project.depth + 1, is_last_task, task_info)
+                tree_lines.append(task_line)
             
-            # Section tasks
-            sections = sections_by_project.get(project.id, [])
-            for section in sorted(sections, key=lambda x: (x.order or 0, x.name)):
+            # Process sections and their tasks
+            sorted_sections = sorted(sections, key=lambda x: (x.order or 0, x.name))
+            for section_idx, section in enumerate(sorted_sections):
+                is_last_section = section_idx == len(sorted_sections) - 1
+                section_line = format_tree_line(project.depth + 1, is_last_section, f"[{section.name}]")
+                tree_lines.append(section_line)
+                
                 section_tasks = [t for t in project_tasks if t.section_id == section.id]
-                for task in sorted(section_tasks, key=lambda x: (x.order or 0, x.content)):
+                sorted_section_tasks = sorted(section_tasks, key=lambda x: (x.order or 0, x.content))
+                
+                for task_idx, task in enumerate(sorted_section_tasks):
+                    is_last_task = task_idx == len(sorted_section_tasks) - 1
                     due_str = task.due.date if task.due else ''
                     labels_str = ", ".join(task.labels) if task.labels else ''
-                    project_name = escape_markdown(project.name)
-                    section_name = escape_markdown(section.name)
-                    task_content = escape_markdown(truncate_text(task.content))
-                    labels_str = escape_markdown(labels_str)
-                    
-                    line = (f"| {project_name} | {task.id} | {task.project_id} | "
-                           f"{task.section_id} | {task.parent_id or '-'} | "
-                           f"{task.order or 0} | {section_name} | "
-                           f"{task_content} | {labels_str} | {due_str} |")
-                    table_lines.append(line)
+                    task_info = f"{task.content} [{labels_str}] {due_str}"
+                    task_line = format_tree_line(project.depth + 2, is_last_task, task_info)
+                    tree_lines.append(task_line)
 
-        # Display the markdown table
-        st.markdown("\n".join(table_lines))
+        # Display as preformatted text
+        st.text("\n".join(tree_lines))
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
