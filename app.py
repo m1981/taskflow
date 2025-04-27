@@ -56,11 +56,12 @@ def organize_projects_and_sections(projects):
     project_map = {project.id: project for project in projects}
 
     def add_items(parent_id, depth):
-        for project in sorted(projects, key=lambda x: x.name):
-            if project.parent_id == parent_id:
-                project.depth = depth
-                organized_items.append(project)
-                add_items(project.id, depth + 2)
+        parent_projects = [p for p in projects if p.parent_id == parent_id]
+        # Sort projects by order
+        for project in sorted(parent_projects, key=lambda x: (x.order or 0, x.name)):
+            project.depth = depth
+            organized_items.append(project)
+            add_items(project.id, depth + 2)
 
     add_items(None, 0)
     return organized_items
@@ -122,27 +123,29 @@ def main():
             project_tasks = tasks_by_project.get(project.id, [])
             
             # Global tasks (no section)
-            for task in project_tasks:
-                if not task.section_id and task.content != "Description":
-                    due_str = task.due.date if task.due else ''
-                    labels_str = ", ".join(task.labels) if task.labels else ''
-                    # Escape special characters and truncate task content
-                    project_name = escape_markdown(project.name)
-                    task_content = escape_markdown(truncate_text(task.content))
-                    labels_str = escape_markdown(labels_str)
-                    
-                    line = (f"| {project_name} | {task.id} | {task.project_id} | "
-                           f"{task.section_id or '-'} | {task.parent_id or '-'} | - | "
-                           f"{task_content} | {labels_str} | {due_str} |")
-                    table_lines.append(line)
+            # Sort tasks by order
+            global_tasks = [t for t in project_tasks if not t.section_id and t.content != "Description"]
+            for task in sorted(global_tasks, key=lambda x: (x.order or 0, x.content)):
+                due_str = task.due.date if task.due else ''
+                labels_str = ", ".join(task.labels) if task.labels else ''
+                project_name = escape_markdown(project.name)
+                task_content = escape_markdown(truncate_text(task.content))
+                labels_str = escape_markdown(labels_str)
+                
+                line = (f"| {project_name} | {task.id} | {task.project_id} | "
+                       f"{task.section_id or '-'} | {task.parent_id or '-'} | - | "
+                       f"{task_content} | {labels_str} | {due_str} |")
+                table_lines.append(line)
             
             # Section tasks
-            for section in sections_by_project.get(project.id, []):
+            # Sort sections by order
+            sections = sections_by_project.get(project.id, [])
+            for section in sorted(sections, key=lambda x: (x.order or 0, x.name)):
                 section_tasks = [t for t in project_tasks if t.section_id == section.id]
-                for task in section_tasks:
+                # Sort tasks within section by order
+                for task in sorted(section_tasks, key=lambda x: (x.order or 0, x.content)):
                     due_str = task.due.date if task.due else ''
                     labels_str = ", ".join(task.labels) if task.labels else ''
-                    # Escape special characters and truncate task content
                     project_name = escape_markdown(project.name)
                     section_name = escape_markdown(section.name)
                     task_content = escape_markdown(truncate_text(task.content))
