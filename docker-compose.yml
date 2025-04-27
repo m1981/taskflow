@@ -1,0 +1,27 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - OPENAI_API_KEY
+    volumes:
+      - .:/app
+    command: python -m streamlit run /app/app.py
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: testing
+    volumes:
+      - ./:/app
+    environment:
+      - PYTHONPATH=/app/src
+    command: >
+      sh -c "cd apps/taskflow &&
+      coverage run -m pytest tests/ &&
+      coverage report -m &&
+      coverage html"

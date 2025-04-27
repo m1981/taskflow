@@ -1,0 +1,4 @@
+todoist-api-python==2.1.7
+openai==1.4.0
+pyyaml
+python-dotenv==1.0.0
