@@ -1,22 +1,23 @@
 from dataclasses import dataclass
 from typing import Optional, List
-from .task import Due
+from src.domain.task import Due
 
 @dataclass(frozen=True)
 class TaskUpdate:
-    """Represents possible updates that can be applied to a Task"""
+    """Represents changes to be applied to a task"""
     content: Optional[str] = None
+    project_id: Optional[str] = None
+    section_id: Optional[str] = None
     labels: Optional[List[str]] = None
     due: Optional[Due] = None
-    section_id: Optional[str] = None
+    task_id: Optional[str] = None
 
     def has_changes(self) -> bool:
-        """
-        Returns True if this update contains any changes (any field is not None)
-        """
+        """Check if the update contains any changes"""
         return any([
             self.content is not None,
+            self.project_id is not None,
+            self.section_id is not None,
             self.labels is not None,
-            self.due is not None,
-            self.section_id is not None
+            self.due is not None
         ])

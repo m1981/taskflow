@@ -207,19 +207,19 @@ I'll outline the implementation order with test cases, following the outside-in 
 - should handle empty/None optional fields
 ```
 
-5. **LiveTodoistRepository** ✅
+5. ✅ **LiveTodoistRepository**
 ```python
-# Test cases for LiveTodoistRepository
-✅ - should connect to Todoist API (integration test)
-✅ - should handle API errors gracefully
-✅ - should convert Todoist tasks to domain Tasks
-✅ - should convert Todoist projects to domain Projects
-✅ - should respect retry configuration
-✅ - should handle rate limiting
-✅ - should maintain task field values during update
+# Test cases for LiveTodoistRepository ✅
+- should connect to Todoist API (integration test)
+- should handle API errors gracefully
+- should convert Todoist tasks to domain Tasks
+- should convert Todoist projects to domain Projects
+- should respect retry configuration
+- should handle rate limiting
+- should maintain task field values during update
 ```
 
-6. **AITaskAnalyzer Interface with Mock Implementation** 🔄 [CURRENT FOCUS]
+6. 🔄 **AITaskAnalyzer Interface with Mock Implementation** [CURRENT FOCUS]
 ```python
 # Test cases for MockAIAnalyzer
 - should analyze task content and suggest project

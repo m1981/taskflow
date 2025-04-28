@@ -3,7 +3,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class Project:
-    """Value object representing a Todoist project"""
+    """Represents a Todoist project"""
     id: str
     name: str
     is_inbox: bool = False
