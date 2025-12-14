@@ -74,27 +74,38 @@ def fetch_projects(api):
         return []
 
 def organize_projects_hierarchy(projects):
-    """Organize projects in hierarchical structure"""
+    """Organize projects in hierarchical structure with tree indicators"""
     project_map = {p['id']: p for p in projects}
     organized = []
     
-    def add_project_with_children(project, depth=0):
+    def add_project_with_children(project, depth=0, is_last=True, parent_prefix=""):
+        # Add tree structure indicators
+        if depth == 0:
+            prefix = ""
+            next_prefix = ""
+        else:
+            prefix = parent_prefix + ("└── " if is_last else "├── ")
+            next_prefix = parent_prefix + ("    " if is_last else "│   ")
+        
         project['depth'] = depth
+        project['tree_prefix'] = prefix
         organized.append(project)
         
         # Add children
         children = [p for p in projects if p['parent_id'] == project['id']]
         children.sort(key=lambda x: (x['order'], x['name']))
         
-        for child in children:
-            add_project_with_children(child, depth + 1)
+        for i, child in enumerate(children):
+            is_last_child = (i == len(children) - 1)
+            add_project_with_children(child, depth + 1, is_last_child, next_prefix)
     
     # Start with root projects (no parent)
     root_projects = [p for p in projects if not p['parent_id']]
     root_projects.sort(key=lambda x: (x['order'], x['name']))
     
-    for project in root_projects:
-        add_project_with_children(project)
+    for i, project in enumerate(root_projects):
+        is_last_root = (i == len(root_projects) - 1)
+        add_project_with_children(project, 0, is_last_root)
     
     return organized
 
@@ -178,6 +189,12 @@ def main():
             # Create indentation based on hierarchy depth
             indent = "　" * project['depth']  # Using full-width space for better alignment
             
+            # Add tree structure indicators
+            if project['depth'] > 0:
+                tree_indicator = "└── " if project['depth'] == 1 else "　　└── "
+            else:
+                tree_indicator = ""
+            
             # Project icon based on type
             if project['is_inbox_project']:
                 icon = "📥"
@@ -194,8 +211,8 @@ def main():
                              f"🟣" if project['color'] == 'purple' else \
                              f"🟠" if project['color'] == 'orange' else "⚪"
             
-            # Display project
-            st.markdown(f"{indent}{icon} **{project['name']}** {color_indicator}")
+            # Display project with tree structure
+            st.markdown(f"{indent}{tree_indicator}{icon} **{project['name']}** {color_indicator}")
     
     with col2:
         st.subheader("Legend")
