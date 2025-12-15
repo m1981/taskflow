@@ -76,14 +76,68 @@ def fetch_projects(api):
 def fetch_inbox_tasks(api):
     """Fetch tasks from inbox project"""
     try:
-        # Get inbox tasks using filter
-        tasks_raw = api.get_tasks(filter="inbox")
-        tasks = []
+        print("DEBUG: Starting to fetch inbox tasks...")
         
-        # Convert to list if it's a paginator
+        # First, find the inbox project ID
+        projects_raw = api.get_projects()
+        print(f"DEBUG: projects_raw type: {type(projects_raw)}")
+        
+        inbox_project_id = None
+        all_projects = list(projects_raw)
+        print(f"DEBUG: Found {len(all_projects)} project items")
+        
+        # Flatten projects first
+        flattened_projects = []
+        for i, item in enumerate(all_projects):
+            if isinstance(item, list):
+                flattened_projects.extend(item)
+            else:
+                flattened_projects.append(item)
+        
+        print(f"DEBUG: Total flattened projects: {len(flattened_projects)}")
+        
+        # Try multiple strategies to find inbox project
+        for i, project in enumerate(flattened_projects[:5]):  # Check first 5 for debugging
+            print(f"DEBUG: Project {i} - name: '{project.name}', id: {project.id}")
+            print(f"DEBUG: Project {i} - all attributes: {dir(project)}")
+            
+            # Strategy 1: Check inbox_project field
+            inbox_field = getattr(project, 'inbox_project', None)
+            print(f"DEBUG: Project {i} - inbox_project: {inbox_field}")
+            
+            # Strategy 2: Check is_inbox_project field  
+            is_inbox_field = getattr(project, 'is_inbox_project', None)
+            print(f"DEBUG: Project {i} - is_inbox_project: {is_inbox_field}")
+            
+            # Strategy 3: Check by name
+            is_inbox_by_name = project.name.lower() in ['inbox', 'skrzynka odbiorcza']
+            print(f"DEBUG: Project {i} - is_inbox_by_name: {is_inbox_by_name}")
+            
+            # Determine if this is the inbox project
+            if inbox_field is True or is_inbox_field is True or is_inbox_by_name:
+                inbox_project_id = project.id
+                print(f"DEBUG: Found inbox project! ID: {inbox_project_id}, Name: {project.name}")
+                break
+        
+        if not inbox_project_id:
+            print("DEBUG: Could not identify inbox project, trying name-based fallback...")
+            for project in flattened_projects:
+                if project.name.lower() in ['inbox', 'skrzynka odbiorcza']:
+                    inbox_project_id = project.id
+                    print(f"DEBUG: Found inbox by name: {project.name}, ID: {inbox_project_id}")
+                    break
+        
+        print(f"DEBUG: Final inbox_project_id: {inbox_project_id}")
+        
+        if not inbox_project_id:
+            print("DEBUG: No inbox project found!")
+            return []
+        
+        # Get all tasks
+        tasks_raw = api.get_tasks()
         all_tasks = list(tasks_raw)
         
-        # Flatten nested lists if needed
+        # Flatten tasks
         flattened_tasks = []
         for item in all_tasks:
             if isinstance(item, list):
@@ -91,18 +145,28 @@ def fetch_inbox_tasks(api):
             else:
                 flattened_tasks.append(item)
         
-        for task in flattened_tasks:
-            tasks.append({
-                'id': task.id,
-                'content': task.content,
-                'due': task.due.date if task.due else None,
-                'labels': task.labels or [],
-                'priority': task.priority,
-                'created_at': task.created_at
-            })
+        print(f"DEBUG: Total flattened tasks: {len(flattened_tasks)}")
         
+        # Filter for inbox tasks
+        tasks = []
+        for task in flattened_tasks:
+            if task.project_id == inbox_project_id:
+                tasks.append({
+                    'id': task.id,
+                    'content': task.content,
+                    'due': task.due.date if task.due and hasattr(task.due, 'date') else None,
+                    'labels': task.labels or [],
+                    'priority': task.priority,
+                    'created_at': getattr(task, 'added_at', getattr(task, 'created_at', None))
+                })
+        
+        print(f"DEBUG: Found {len(tasks)} inbox tasks")
         return tasks
+        
     except Exception as e:
+        print(f"DEBUG: Exception occurred: {e}")
+        import traceback
+        print(f"DEBUG: Full traceback: {traceback.format_exc()}")
         st.error(f"Error fetching inbox tasks: {e}")
         return []
 
