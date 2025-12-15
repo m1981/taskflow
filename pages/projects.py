@@ -315,8 +315,17 @@ def main():
                              f"🟠" if project['color'] == 'orange' else "⚪"
             
             # Display project with proper tree structure
+            # FIX STARTS HERE
             tree_prefix = project.get('tree_prefix', '')
-            st.markdown(f"`{tree_prefix}`{icon} **{project['name']}** {color_indicator}")
+
+            # Only apply markdown code styling (backticks) if there is a prefix
+            # Otherwise, leave it empty to avoid the double backtick artifact
+            if tree_prefix:
+                formatted_prefix = f"`{tree_prefix}`"
+            else:
+                formatted_prefix = ""
+
+            st.markdown(f"{formatted_prefix}{icon} **{project['name']}** {color_indicator}")
     
     with col2:
         st.subheader("📥 Inbox Tasks")
