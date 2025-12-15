@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 from datetime import datetime, timedelta
+from typing import Optional
 from dotenv import load_dotenv
 from todoist_api_python.api import TodoistAPI
 
@@ -45,10 +46,8 @@ def fetch_projects(api):
         projects_raw = api.get_projects()
         projects = []
         
-        # Convert paginator to list and flatten if needed
+        # Convert to list and flatten if needed
         all_projects = list(projects_raw)
-        
-        # Flatten nested lists
         flattened_projects = []
         for item in all_projects:
             if isinstance(item, list):
@@ -62,9 +61,9 @@ def fetch_projects(api):
                 'name': project.name,
                 'color': project.color,
                 'is_favorite': project.is_favorite,
-                'is_inbox_project': getattr(project, 'inbox_project', project.is_inbox_project if hasattr(project, 'is_inbox_project') else False),
+                'is_inbox_project': getattr(project, 'inbox_project', False),  # Fixed attribute name
                 'parent_id': project.parent_id,
-                'order': getattr(project, 'child_order', project.order if hasattr(project, 'order') else 0) or 0,
+                'order': getattr(project, 'child_order', 0) or 0,  # Fixed order field
                 'comment_count': getattr(project, 'comment_count', 0)
             })
         
@@ -73,71 +72,91 @@ def fetch_projects(api):
         st.error(f"Error fetching projects: {e}")
         return []
 
-def fetch_inbox_tasks(api):
-    """Fetch tasks from inbox project"""
+def find_inbox_project_id(api) -> Optional[str]:
+    """Find inbox project ID using correct API attributes"""
     try:
-        print("DEBUG: Starting to fetch inbox tasks...")
-        
-        # First, find the inbox project ID
         projects_raw = api.get_projects()
-        print(f"DEBUG: projects_raw type: {type(projects_raw)}")
         
-        inbox_project_id = None
-        all_projects = list(projects_raw)
-        print(f"DEBUG: Found {len(all_projects)} project items")
-        
-        # Flatten projects first
+        # Flatten nested project lists if needed
         flattened_projects = []
-        for i, item in enumerate(all_projects):
+        all_projects = list(projects_raw)
+        
+        for item in all_projects:
             if isinstance(item, list):
                 flattened_projects.extend(item)
             else:
                 flattened_projects.append(item)
         
-        print(f"DEBUG: Total flattened projects: {len(flattened_projects)}")
+        # Detection strategies in order of reliability
+        for project in flattened_projects:
+            # Strategy 1: Check inbox_project attribute
+            if getattr(project, 'inbox_project', False):
+                return project.id
         
-        # Try multiple strategies to find inbox project
-        for i, project in enumerate(flattened_projects[:5]):  # Check first 5 for debugging
-            print(f"DEBUG: Project {i} - name: '{project.name}', id: {project.id}")
-            print(f"DEBUG: Project {i} - all attributes: {dir(project)}")
-            
-            # Strategy 1: Check inbox_project field
-            inbox_field = getattr(project, 'inbox_project', None)
-            print(f"DEBUG: Project {i} - inbox_project: {inbox_field}")
-            
-            # Strategy 2: Check is_inbox_project field  
-            is_inbox_field = getattr(project, 'is_inbox_project', None)
-            print(f"DEBUG: Project {i} - is_inbox_project: {is_inbox_field}")
-            
-            # Strategy 3: Check by name
-            is_inbox_by_name = project.name.lower() in ['inbox', 'skrzynka odbiorcza']
-            print(f"DEBUG: Project {i} - is_inbox_by_name: {is_inbox_by_name}")
-            
-            # Determine if this is the inbox project
-            if inbox_field is True or is_inbox_field is True or is_inbox_by_name:
-                inbox_project_id = project.id
-                print(f"DEBUG: Found inbox project! ID: {inbox_project_id}, Name: {project.name}")
-                break
+        # Strategy 2: Check is_inbox_project attribute (fallback)
+        for project in flattened_projects:
+            if getattr(project, 'is_inbox_project', False):
+                return project.id
         
-        if not inbox_project_id:
-            print("DEBUG: Could not identify inbox project, trying name-based fallback...")
-            for project in flattened_projects:
-                if project.name.lower() in ['inbox', 'skrzynka odbiorcza']:
-                    inbox_project_id = project.id
-                    print(f"DEBUG: Found inbox by name: {project.name}, ID: {inbox_project_id}")
-                    break
+        # Strategy 3: Name matching (last resort)
+        for project in flattened_projects:
+            if hasattr(project, 'name') and project.name.lower() in ['inbox', 'skrzynka odbiorcza']:
+                return project.id
         
-        print(f"DEBUG: Final inbox_project_id: {inbox_project_id}")
+        return None
         
-        if not inbox_project_id:
-            print("DEBUG: No inbox project found!")
-            return []
+    except Exception as e:
+        st.error(f"Error finding inbox project: {e}")
+        return None
+
+def organize_tasks_hierarchy(tasks):
+    """Organize tasks with sub-task indentation"""
+    task_map = {task['id']: task for task in tasks}
+    organized = []
+    
+    def add_task_with_subtasks(task, depth=0, parent_prefix=""):
+        # Add indentation for sub-tasks
+        if depth == 0:
+            prefix = ""
+            next_prefix = ""
+        else:
+            prefix = parent_prefix + ("  └── " if depth > 0 else "")
+            next_prefix = parent_prefix + "      "
         
-        # Get all tasks
-        tasks_raw = api.get_tasks()
+        task['depth'] = depth
+        task['tree_prefix'] = prefix
+        organized.append(task)
+        
+        # Add sub-tasks
+        subtasks = [t for t in tasks if t.get('parent_id') == task['id']]
+        subtasks.sort(key=lambda x: (x.get('child_order', 0), x['content']))
+        
+        for subtask in subtasks:
+            add_task_with_subtasks(subtask, depth + 1, next_prefix)
+    
+    # Start with root tasks (no parent)
+    root_tasks = [t for t in tasks if not t.get('parent_id')]
+    root_tasks.sort(key=lambda x: (x.get('child_order', 0), x['content']))
+    
+    for task in root_tasks:
+        add_task_with_subtasks(task, 0)
+    
+    return organized
+
+def fetch_inbox_tasks(api):
+    """Fetch tasks from inbox project with sub-task support"""
+    inbox_project_id = find_inbox_project_id(api)
+    
+    if not inbox_project_id:
+        st.warning("Could not identify inbox project")
+        return []
+    
+    try:
+        # Use filter to get only inbox tasks (more efficient)
+        tasks_raw = api.get_tasks(project_id=inbox_project_id)
         all_tasks = list(tasks_raw)
         
-        # Flatten tasks
+        # Flatten nested task lists if needed
         flattened_tasks = []
         for item in all_tasks:
             if isinstance(item, list):
@@ -145,28 +164,24 @@ def fetch_inbox_tasks(api):
             else:
                 flattened_tasks.append(item)
         
-        print(f"DEBUG: Total flattened tasks: {len(flattened_tasks)}")
-        
-        # Filter for inbox tasks
-        tasks = []
+        # Convert to our format
+        inbox_tasks = []
         for task in flattened_tasks:
-            if task.project_id == inbox_project_id:
-                tasks.append({
-                    'id': task.id,
-                    'content': task.content,
-                    'due': task.due.date if task.due and hasattr(task.due, 'date') else None,
-                    'labels': task.labels or [],
-                    'priority': task.priority,
-                    'created_at': getattr(task, 'added_at', getattr(task, 'created_at', None))
-                })
+            inbox_tasks.append({
+                'id': task.id,
+                'content': task.content,
+                'due': task.due.date if task.due and hasattr(task.due, 'date') else None,
+                'labels': task.labels or [],
+                'priority': task.priority,
+                'parent_id': getattr(task, 'parent_id', None),
+                'child_order': getattr(task, 'child_order', 0),
+                'created_at': getattr(task, 'added_at', None)
+            })
         
-        print(f"DEBUG: Found {len(tasks)} inbox tasks")
-        return tasks
+        # Organize with hierarchy
+        return organize_tasks_hierarchy(inbox_tasks)
         
     except Exception as e:
-        print(f"DEBUG: Exception occurred: {e}")
-        import traceback
-        print(f"DEBUG: Full traceback: {traceback.format_exc()}")
         st.error(f"Error fetching inbox tasks: {e}")
         return []
 
