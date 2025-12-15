@@ -1,0 +1,12 @@
+[project]
+name = "taskflow"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "openai>=2.11.0",
+    "pyyaml>=6.0.3",
+    "streamlit-aggrid>=1.0.5",
+    "todoist-api-python>=3.1.0",
+]
