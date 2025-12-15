@@ -73,6 +73,39 @@ def fetch_projects(api):
         st.error(f"Error fetching projects: {e}")
         return []
 
+def fetch_inbox_tasks(api):
+    """Fetch tasks from inbox project"""
+    try:
+        # Get inbox tasks using filter
+        tasks_raw = api.get_tasks(filter="inbox")
+        tasks = []
+        
+        # Convert to list if it's a paginator
+        all_tasks = list(tasks_raw)
+        
+        # Flatten nested lists if needed
+        flattened_tasks = []
+        for item in all_tasks:
+            if isinstance(item, list):
+                flattened_tasks.extend(item)
+            else:
+                flattened_tasks.append(item)
+        
+        for task in flattened_tasks:
+            tasks.append({
+                'id': task.id,
+                'content': task.content,
+                'due': task.due.date if task.due else None,
+                'labels': task.labels or [],
+                'priority': task.priority,
+                'created_at': task.created_at
+            })
+        
+        return tasks
+    except Exception as e:
+        st.error(f"Error fetching inbox tasks: {e}")
+        return []
+
 def organize_projects_hierarchy(projects):
     """Organize projects in hierarchical structure with tree indicators"""
     project_map = {p['id']: p for p in projects}
@@ -186,15 +219,6 @@ def main():
     
     with col1:
         for project in organized_projects:
-            # Create indentation based on hierarchy depth
-            indent = "　" * project['depth']  # Using full-width space for better alignment
-            
-            # Add tree structure indicators
-            if project['depth'] > 0:
-                tree_indicator = "└── " if project['depth'] == 1 else "　　└── "
-            else:
-                tree_indicator = ""
-            
             # Project icon based on type
             if project['is_inbox_project']:
                 icon = "📥"
@@ -211,15 +235,39 @@ def main():
                              f"🟣" if project['color'] == 'purple' else \
                              f"🟠" if project['color'] == 'orange' else "⚪"
             
-            # Display project with tree structure
-            st.markdown(f"{indent}{tree_indicator}{icon} **{project['name']}** {color_indicator}")
+            # Display project with proper tree structure
+            tree_prefix = project.get('tree_prefix', '')
+            st.markdown(f"`{tree_prefix}`{icon} **{project['name']}** {color_indicator}")
     
     with col2:
-        st.subheader("Legend")
-        st.markdown("📥 Inbox Project")
-        st.markdown("⭐ Favorite")
-        st.markdown("📁 Regular Project")
-        st.markdown("🟢🔵🔴🟡🟣🟠⚪ Colors")
+        st.subheader("📥 Inbox Tasks")
+        
+        # Fetch and display inbox tasks
+        try:
+            api = TodoistAPI(api_key)
+            with st.spinner("Loading inbox tasks..."):
+                inbox_tasks = fetch_inbox_tasks(api)
+            
+            if inbox_tasks:
+                for task in inbox_tasks:
+                    # Priority indicator
+                    priority_icon = "🔴" if task['priority'] == 4 else \
+                                   "🟡" if task['priority'] == 3 else \
+                                   "🔵" if task['priority'] == 2 else ""
+                    
+                    # Due date indicator
+                    due_text = f" 📅 {task['due']}" if task['due'] else ""
+                    
+                    # Labels
+                    labels_text = f" 🏷️ {', '.join(task['labels'])}" if task['labels'] else ""
+                    
+                    # Display task
+                    st.markdown(f"{priority_icon} {task['content']}{due_text}{labels_text}")
+            else:
+                st.info("No inbox tasks found")
+                
+        except Exception as e:
+            st.error(f"Error loading inbox tasks: {e}")
 
 if __name__ == "__main__":
     main()
